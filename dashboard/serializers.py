@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from dashboard.models import Dashboard
 from farm_overview.serializers import FarmSerializer, SoilReadingSerializer, WeatherLogSerializer
+from reports.serializers import MonthlyFarmReportSerializer
 
 
 class DashboardSerializer(serializers.ModelSerializer):
@@ -12,6 +13,7 @@ class DashboardSerializer(serializers.ModelSerializer):
     total_livestock = serializers.SerializerMethodField()
     latest_soil_reading = serializers.SerializerMethodField()
     latest_weather_log = serializers.SerializerMethodField()
+    monthly_reports = serializers.SerializerMethodField()
 
     class Meta:
         model = Dashboard
@@ -28,6 +30,7 @@ class DashboardSerializer(serializers.ModelSerializer):
             'total_livestock',
             'latest_soil_reading',
             'latest_weather_log',
+            'monthly_reports',
         ]
 
     def get_total_farms(self, obj):
@@ -49,3 +52,6 @@ class DashboardSerializer(serializers.ModelSerializer):
     def get_latest_weather_log(self, obj):
         latest = obj.latest_weather_log
         return WeatherLogSerializer(latest).data if latest else None
+
+    def get_monthly_reports(self, obj):
+        return MonthlyFarmReportSerializer(obj.monthly_reports, many=True).data

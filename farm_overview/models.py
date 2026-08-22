@@ -135,7 +135,7 @@ class AnalyticsSnapshot(models.Model):
 class Report(models.Model):
     farm = models.ForeignKey(Farm, on_delete=models.CASCADE, related_name="reports")
     title = models.CharField(max_length=255)
-    report_type = models.CharField(max_length=100, default="production")
+    report_type = models.CharField(max_length=100, default="")
     period_label = models.CharField(max_length=100, blank=True, null=True)
     generated_at = models.DateTimeField(default=timezone.now)
     summary = models.TextField(blank=True, null=True)

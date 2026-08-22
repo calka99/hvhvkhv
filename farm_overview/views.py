@@ -2,18 +2,22 @@
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Farm, Settings
+from .models import Alert, Farm, Livestock, MarketPrice, Settings
 from .serializers import (
+    AlertSerializer,
     FarmCreateSerializer,
     FarmOutSerializer,
     FarmOverviewSerializer,
+    LivestockSerializer,
+    MarketPriceSerializer,
 )
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 
 # Create your views here.
 
 @api_view(['GET'])
+@permission_classes([IsAdminUser])
 def list_farms(request):
     farms = Farm.objects.all()
     serializer = FarmOutSerializer(farms, many=True)
@@ -21,12 +25,12 @@ def list_farms(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([IsAuthenticated])
 def create_farm(request):
     serializer = FarmCreateSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    farm = serializer.save()
+    farm = serializer.save(owner=request.user)
     Settings.objects.create(farm=farm)  # default settings row
     out = FarmOutSerializer(farm)
     return Response(out.data, status=status.HTTP_201_CREATED)
@@ -43,7 +47,7 @@ def get_farm(request, farm_id):
 def get_farm_overview(request, farm_id):
     farm = get_object_or_404(Farm, pk=farm_id)
 
-    active_crops = farm.crops.count()
+    active_crops = farm.registered_crops.count()
     open_pest_alerts = farm.pest_alerts.filter(resolved=False).count()
     livestock_count = farm.livestock.count()
     latest_soil = farm.soil_readings.order_by('-recorded_at').first()
@@ -63,3 +67,23 @@ def get_farm_overview(request, farm_id):
     }
     serializer = FarmOverviewSerializer(overview_data)
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_livestock(request):
+    farm = get_object_or_404(Farm, pk=request.query_params.get('farm_id'), owner=request.user)
+    return Response(LivestockSerializer(farm.livestock.all(), many=True).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_market_prices(request):
+    return Response(MarketPriceSerializer(MarketPrice.objects.all(), many=True).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_alerts(request):
+    farm = get_object_or_404(Farm, pk=request.query_params.get('farm_id'), owner=request.user)
+    return Response(AlertSerializer(farm.alerts.all().order_by('-created_at'), many=True).data)

@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-wm!gme88%uy7j-7_)zum+ll&rtjw8$(qfdrkozbvh3yg%^nb(_
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -41,16 +41,19 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'farm_overview',
-    'crop',
+    'crop_data',
     'dashboard',
-    'analytics',
-    'soil',
-    'irrigation',
+    'analytics_info',
+    'soil_health',
+    'irrigation_event',
     'reports',
-    'weather',
+    'weather_log',
     'pest_management',
     'settings',
     'accounts',
+    'ai_recommendation',
+    'livestock_data',
+    'market_data',
 
     'rest_framework',
     'corsheaders',
@@ -154,7 +157,7 @@ REST_FRAMEWORK ={
 
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': False,
     'ALGORITHM': 'HS256',

@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 
 from farm_overview.models import PestAlert
@@ -59,7 +59,7 @@ def delete_pest_alert(request, pest_alert_id):
 
 
 @api_view(['PATCH'])
-@permission_classes([IsAdminUser])
+@permission_classes([IsAuthenticated])
 def resolve_pest_alert(request, pest_alert_id):
     pest = get_object_or_404(PestAlert, pk=pest_alert_id)
     pest.resolved = True

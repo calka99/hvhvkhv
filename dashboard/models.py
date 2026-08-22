@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
-from crop.models import Crop
+from crop_data.models import Crop
 
 
 class Dashboard(models.Model):
@@ -57,3 +57,9 @@ class Dashboard(models.Model):
             if weather and (latest is None or weather.recorded_at > latest.recorded_at):
                 latest = weather
         return latest
+
+    @property
+    def monthly_reports(self):
+        from reports.models import MonthlyFarmReport
+
+        return MonthlyFarmReport.objects.filter(farm__owner=self.owner).select_related('farm', 'generated_by')

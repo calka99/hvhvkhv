@@ -42,6 +42,7 @@ class DashboardOverviewTests(APITestCase):
             recommended_action='Monitor irrigation',
         )
 
+        self.client.force_authenticate(user=user)
         response = self.client.get(reverse('dashboard-overview'))
 
         self.assertEqual(response.status_code, 200)
