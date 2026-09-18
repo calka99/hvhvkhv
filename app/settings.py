@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-wm!gme88%uy7j-7_)zum+ll&rtjw8$(qfdrkozbvh3yg%^nb(_
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*', 'http://localhost:3000/']
 
 
 # Application definition
@@ -161,5 +161,5 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': False,
     'ALGORITHM': 'HS256',
-    'AUTH_HEADER TYPES':('Bearer',),
+    'AUTH_HEADER_TYPES':('Bearer',),
 }

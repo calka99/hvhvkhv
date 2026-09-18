@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from dashboard.models import Dashboard
 from .serializers import (
     RegisterSerializer,
     UserProfileSerializer,
@@ -22,6 +23,7 @@ def register(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     user = serializer.save()
+    Dashboard.objects.create(owner=user)
     refresh = RefreshToken.for_user(user)
 
     return Response(
@@ -46,9 +48,17 @@ def login(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    identifier = str(identifier).strip()
+
     user = None
     if '@' in identifier:
-        user = User.objects.filter(email__iexact=identifier).first()
+        matching_users = User.objects.filter(email__iexact=identifier)
+        if matching_users.count() > 1:
+            return Response(
+                {'detail': 'This email is linked to multiple accounts. Sign in with your username.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user = matching_users.first()
     else:
         user = User.objects.filter(username__iexact=identifier).first()
 

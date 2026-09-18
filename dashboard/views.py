@@ -10,10 +10,7 @@ from dashboard.serializers import DashboardSerializer
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_overview(request):
-    dashboard = Dashboard.objects.filter(owner=request.user).order_by('-updated_at').first()
-
-    if dashboard is None:
-        return Response({'detail': 'No dashboard available.'}, status=404)
+    dashboard, _ = Dashboard.objects.get_or_create(owner=request.user)
 
     serializer = DashboardSerializer(dashboard)
     return Response(serializer.data)
