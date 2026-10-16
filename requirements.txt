@@ -8,3 +8,4 @@ djangorestframework-simplejwt==5.3.1
 python-dotenv
 sqlparse==0.5.5
 tzdata==2026.3
+gunicorn
