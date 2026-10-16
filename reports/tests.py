@@ -61,3 +61,64 @@ class MonthlyFarmReportTests(APITestCase):
 		)
 
 		self.assertEqual(response.status_code, 400)
+
+	def test_regular_user_can_generate_reports_for_all_owned_farms_only(self):
+		self.client.post(
+			reverse('monthly-report-generate'),
+			{'month': '2026-08', 'farm_id': self.farm.id},
+			format='json',
+		)
+		owner = User.objects.create_user(
+			username='farm_owner',
+			email='owner@example.com',
+			password='StrongPass123!',
+		)
+		owned_farm = Farm.objects.create(
+			owner=owner,
+			name='Owner Farm',
+			location='Lagos',
+			size_hectares=2,
+		)
+		Farm.objects.create(
+			owner=self.admin,
+			name='Another Owner Farm',
+			location='Kano',
+			size_hectares=3,
+		)
+		self.client.force_authenticate(owner)
+
+		response = self.client.post(
+			reverse('monthly-report-generate'),
+			{'month': '2026-08'},
+			format='json',
+		)
+
+		self.assertEqual(response.status_code, 201)
+		self.assertEqual([report['farm'] for report in response.data], [owned_farm.id])
+
+		list_response = self.client.get(reverse('monthly-report-list'))
+
+		self.assertEqual(list_response.status_code, 200)
+		self.assertEqual([report['farm'] for report in list_response.data], [owned_farm.id])
+
+		other_farm_response = self.client.get(
+			reverse('monthly-report-list'),
+			{'farm_id': self.farm.id},
+		)
+		self.assertEqual(other_farm_response.status_code, 404)
+
+	def test_owner_cannot_generate_report_for_another_users_farm(self):
+		owner = User.objects.create_user(
+			username='limited_owner',
+			email='limited@example.com',
+			password='StrongPass123!',
+		)
+		self.client.force_authenticate(owner)
+
+		response = self.client.post(
+			reverse('monthly-report-generate'),
+			{'month': '2026-08', 'farm_id': self.farm.id},
+			format='json',
+		)
+
+		self.assertEqual(response.status_code, 404)

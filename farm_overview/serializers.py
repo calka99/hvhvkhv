@@ -98,10 +98,10 @@ class SettingsSerializer(serializers.ModelSerializer):
 class FarmOverviewSerializer(serializers.Serializer):
     farm = FarmSerializer()
     active_crops = serializers.IntegerField()
+    total_crop_yield_kg = serializers.FloatField()
     open_pest_alerts = serializers.IntegerField()
     livestock_count = serializers.IntegerField()
     latest_soil = SoilReadingSerializer(allow_null=True)
     latest_weather = WeatherLogSerializer(allow_null=True)
     upcoming_irrigation = IrrigationEventSerializer(many=True)
     recent_alerts = AlertSerializer(many=True)
-

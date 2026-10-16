@@ -4,7 +4,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from farm_overview.models import (
@@ -14,6 +14,7 @@ from farm_overview.models import (
 	Farm,
 	IrrigationEvent,
 	Livestock,
+	LivestockHealthAlert,
 	PestAlert,
 	SoilReading,
 	WeatherLog,
@@ -54,6 +55,11 @@ def build_activity_data(farm, month):
 	alerts = Alert.objects.filter(farm=farm, created_at__gte=start, created_at__lt=end)
 	analytics = AnalyticsSnapshot.objects.filter(farm=farm, period_label=month.strftime('%Y-%m'))
 	livestock = Livestock.objects.filter(farm=farm)
+	livestock_health_alerts = LivestockHealthAlert.objects.filter(
+		farm=farm,
+		detected_at__gte=start,
+		detected_at__lt=end,
+	).select_related('livestock')
 
 	soil_values = list(soil_readings.values('moisture_pct', 'ph_level'))
 	average = lambda key: round(sum(item[key] for item in soil_values) / len(soil_values), 2) if soil_values else None
@@ -62,11 +68,17 @@ def build_activity_data(farm, month):
 	feedback_signals = []
 	unresolved_pests = pest_alerts.filter(resolved=False).count()
 	high_risk_pests = pest_alerts.filter(risk_level__in=['high', 'critical']).count()
+	unresolved_livestock_alerts = livestock_health_alerts.filter(resolved=False).count()
+	high_risk_livestock_alerts = livestock_health_alerts.filter(severity__in=['high', 'critical']).count()
 
 	if unresolved_pests:
 		feedback_signals.append(f'{unresolved_pests} pest alert(s) remain unresolved.')
 	if high_risk_pests:
 		feedback_signals.append(f'{high_risk_pests} high-risk pest alert(s) need urgent review.')
+	if unresolved_livestock_alerts:
+		feedback_signals.append(f'{unresolved_livestock_alerts} livestock disease alert(s) remain unresolved.')
+	if high_risk_livestock_alerts:
+		feedback_signals.append(f'{high_risk_livestock_alerts} high-severity livestock disease alert(s) need urgent review.')
 	if irrigation_events.exists() and water == 0:
 		feedback_signals.append('Irrigation events have no recorded water volume.')
 	if average('moisture_pct') is not None and average('moisture_pct') < 30:
@@ -82,6 +94,7 @@ def build_activity_data(farm, month):
 			'weather_logs': weather_logs.count(),
 			'irrigation_events': irrigation_events.count(),
 			'pest_alerts': pest_alerts.count(),
+			'livestock_health_alerts': livestock_health_alerts.count(),
 			'farm_alerts': alerts.count(),
 			'analytics_snapshots': analytics.count(),
 		},
@@ -113,6 +126,19 @@ def build_activity_data(farm, month):
 				{'id': item.id, 'crop_name': item.crop_name, 'pest_or_disease': item.pest_or_disease, 'risk_level': item.risk_level, 'detected_at': iso(item.detected_at), 'resolved': item.resolved, 'recommended_action': item.recommended_action}
 				for item in pest_alerts
 			],
+			'livestock_health_alerts': [
+				{
+					'id': item.id,
+					'livestock_id': item.livestock_id,
+					'livestock_name': item.livestock.species,
+					'disease_name': item.disease_name,
+					'severity': item.severity,
+					'detected_at': iso(item.detected_at),
+					'resolved': item.resolved,
+					'recommended_action': item.recommended_action,
+				}
+				for item in livestock_health_alerts
+			],
 			'farm_alerts': [
 				{'id': item.id, 'category': item.category, 'severity': item.severity, 'message': item.message, 'created_at': iso(item.created_at), 'acknowledged': item.acknowledged}
 				for item in alerts
@@ -137,7 +163,7 @@ def generate_report(farm, month, user):
 
 
 @api_view(['GET'])
-@permission_classes([IsAdminUser])
+@permission_classes([IsAuthenticated])
 def list_monthly_reports(request):
 	month_value = request.query_params.get('month')
 	if month_value:
@@ -145,23 +171,28 @@ def list_monthly_reports(request):
 			month = parse_month(month_value)
 		except ValueError as error:
 			return Response({'detail': str(error)}, status=status.HTTP_400_BAD_REQUEST)
-		reports = MonthlyFarmReport.objects.filter(month=month)
+		reports = MonthlyFarmReport.objects.filter(farm__owner=request.user, month=month)
 	else:
-		reports = MonthlyFarmReport.objects.all()
+		reports = MonthlyFarmReport.objects.filter(farm__owner=request.user)
 	farm_id = request.query_params.get('farm_id')
 	if farm_id:
+		get_object_or_404(Farm, pk=farm_id, owner=request.user)
 		reports = reports.filter(farm_id=farm_id)
 	return Response(MonthlyFarmReportSerializer(reports, many=True).data)
 
 
 @api_view(['POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([IsAuthenticated])
 def generate_monthly_reports(request):
 	try:
 		month = parse_month(request.data.get('month'))
 	except ValueError as error:
 		return Response({'detail': str(error)}, status=status.HTTP_400_BAD_REQUEST)
-	farms = Farm.objects.filter(pk=request.data.get('farm_id')) if request.data.get('farm_id') else Farm.objects.all()
+	farms = Farm.objects.filter(owner=request.user)
+	farm_id = request.data.get('farm_id')
+	if farm_id:
+		farm = get_object_or_404(Farm, pk=farm_id, owner=request.user)
+		farms = farms.filter(pk=farm.pk)
 	reports = [generate_report(farm, month, request.user) for farm in farms]
 	return Response(MonthlyFarmReportSerializer(reports, many=True).data, status=status.HTTP_201_CREATED)
 

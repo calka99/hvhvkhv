@@ -3,6 +3,7 @@ from farm_overview.models import PestAlert
 
 
 class PestAlertSerializer(serializers.ModelSerializer):
+    farm_name = serializers.CharField(source='farm.name', read_only=True)
     crop_name = serializers.CharField()
     pest_or_disease = serializers.CharField()
     risk_level = serializers.CharField(default='low')
@@ -14,6 +15,7 @@ class PestAlertSerializer(serializers.ModelSerializer):
     class Meta:
         model = PestAlert
         fields = '__all__'
+        read_only_fields = ['farm']
 
 
 class PestAlertCreateSerializer(serializers.ModelSerializer):

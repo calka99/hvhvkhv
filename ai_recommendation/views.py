@@ -1,89 +1,130 @@
-from django.shortcuts import get_object_or_404
+import logging
+
+from django.conf import settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from farm_overview.models import Farm
+from reports.views import build_activity_data, parse_month
+from settings.models import FarmPreference
+
 from .models import Recommendation
-from .serializers import RecommendationSerializer
+from .services import generate_ai_recommendations
+
+logger = logging.getLogger(__name__)
 
 
-def build_recommendations(farm):
-	recommendations = []
-	soil = farm.soil_readings.order_by('-recorded_at').first()
-	weather = farm.weather_logs.order_by('-recorded_at').first()
-	open_pests = farm.pest_alerts.filter(resolved=False).count()
-
-	if soil and soil.moisture_pct < 30:
-		recommendations.append({
-			'category': 'irrigation',
-			'title': 'Increase irrigation attention',
-			'message': f'Soil moisture is {soil.moisture_pct:.1f}%. Check irrigation for dry zones.',
-			'priority': 'high',
-			'source_data': {'moisture_pct': soil.moisture_pct},
-		})
-	elif soil and soil.moisture_pct > 80:
-		recommendations.append({
-			'category': 'irrigation',
-			'title': 'Reduce irrigation',
-			'message': f'Soil moisture is {soil.moisture_pct:.1f}%. Pause unnecessary watering and check drainage.',
-			'priority': 'medium',
-			'source_data': {'moisture_pct': soil.moisture_pct},
-		})
-
-	if soil and not 5.5 <= soil.ph_level <= 7.5:
-		recommendations.append({
-			'category': 'soil',
-			'title': 'Review soil pH',
-			'message': f'Soil pH is {soil.ph_level:.1f}. Test the affected area before applying amendments.',
-			'priority': 'medium',
-			'source_data': {'ph_level': soil.ph_level},
-		})
-
-	if weather and weather.rainfall_mm > 20:
-		recommendations.append({
-			'category': 'weather',
-			'title': 'Inspect fields after heavy rain',
-			'message': f'{weather.rainfall_mm:.1f} mm of rain was recorded. Check drainage and root exposure.',
-			'priority': 'medium',
-			'source_data': {'rainfall_mm': weather.rainfall_mm},
-		})
-
-	if open_pests:
-		recommendations.append({
-			'category': 'pest',
-			'title': 'Review open pest alerts',
-			'message': f'{open_pests} unresolved pest alert(s) need attention.',
-			'priority': 'high',
-			'source_data': {'open_pest_alerts': open_pests},
-		})
-
-	if not recommendations:
-		recommendations.append({
-			'category': 'general',
-			'title': 'Maintain current farm plan',
-			'message': 'Current readings show no immediate issues. Continue monitoring soil, weather, and crops.',
-			'priority': 'low',
-			'source_data': {},
-		})
-
-	return recommendations
+def _month_from_request(request, method):
+	value = request.data.get('month') if method == 'POST' else request.query_params.get('month')
+	if not value:
+		return timezone.localdate().replace(day=1)
+	try:
+		return parse_month(value)
+	except ValueError as error:
+		raise ValueError('month must use YYYY-MM format.') from error
 
 
-@api_view(['GET', 'POST'])
+def _monthly_activity(farm, month):
+	activity_data = build_activity_data(farm, month)
+	activity_counts = activity_data['activity_counts']
+	has_activity = any(
+		count > 0
+		for key, count in activity_counts.items()
+		if key != 'analytics_snapshots'
+	)
+	recommendation_data = {
+		**activity_data,
+		'activity_counts': {
+			key: count for key, count in activity_counts.items()
+			if key != 'analytics_snapshots'
+		},
+		'activities': {
+			key: records for key, records in activity_data['activities'].items()
+			if key not in {'livestock_snapshot', 'analytics_snapshots'}
+		},
+	}
+	return has_activity, recommendation_data['activity_counts'], recommendation_data
+
+
+@api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def recommendations(request):
-	farm = get_object_or_404(Farm, pk=request.query_params.get('farm_id'), owner=request.user)
+	try:
+		month = _month_from_request(request, request.method)
+	except ValueError as error:
+		return Response({'detail': str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-	if request.method == 'POST':
-		Recommendation.objects.filter(farm=farm, is_active=True).update(is_active=False)
-		records = Recommendation.objects.bulk_create([
-			Recommendation(farm=farm, **item) for item in build_recommendations(farm)
-		])
-		return Response(RecommendationSerializer(records, many=True).data, status=status.HTTP_201_CREATED)
+	farm_id = request.data.get('farm_id')
+	if not farm_id:
+		return Response(
+			{'detail': 'Select a farm to generate recommendations.'},
+			status=status.HTTP_400_BAD_REQUEST,
+		)
+	farm = get_object_or_404(Farm, pk=farm_id, owner=request.user)
+	preference, _ = FarmPreference.objects.get_or_create(owner=request.user)
+	if not preference.ai_recommendations_enabled:
+		return Response(
+			{'detail': 'AI recommendations are disabled in your account settings.'},
+			status=status.HTTP_403_FORBIDDEN,
+		)
 
-	records = Recommendation.objects.filter(farm=farm, is_active=True)
-	if not records.exists():
-		records = [Recommendation(farm=farm, **item) for item in build_recommendations(farm)]
-	return Response(RecommendationSerializer(records, many=True).data)
+	has_activity, _, activity_data = _monthly_activity(farm, month)
+	if not has_activity:
+		return Response({
+			'farm_id': farm.id,
+			'farm_name': farm.name,
+			'month': month.isoformat(),
+			'status': 'no_activity',
+			'recommendation_count': 0,
+			'detail': 'No farm activities were recorded for this month, so no recommendations were generated.',
+		})
+
+	if not settings.GROQ_API_KEY:
+		return Response(
+			{'detail': 'AI recommendations are not configured. Set GROQ_API_KEY in the backend environment and restart Django.'},
+			status=status.HTTP_503_SERVICE_UNAVAILABLE,
+		)
+
+	try:
+		activity_data['activities'].pop('livestock_snapshot', None)
+		recommendation_data = generate_ai_recommendations(farm, month, activity_data)
+	except Exception:
+		logger.exception(
+			'Monthly AI recommendation generation failed for farm_id=%s, user_id=%s.',
+			farm.id,
+			request.user.id,
+		)
+		return Response(
+			{'detail': 'AI recommendation generation failed. Existing recommendations were not changed; check the backend logs for the provider error.'},
+			status=status.HTTP_503_SERVICE_UNAVAILABLE,
+		)
+
+	Recommendation.objects.filter(
+		farm=farm,
+		month=month,
+		is_active=True,
+		source_data__generator='ai',
+	).update(is_active=False)
+	records = Recommendation.objects.bulk_create([
+		Recommendation(
+			farm=farm,
+			month=month,
+			**{**item, 'source_data': {'generator': 'ai'}},
+		)
+		for item in recommendation_data
+	])
+	return Response({
+		'farm_id': farm.id,
+		'farm_name': farm.name,
+		'month': month.isoformat(),
+		'status': 'generated' if records else 'no_recommendations',
+		'recommendation_count': len(records),
+		'detail': (
+			f'Generated {len(records)} recommendation(s) for {farm.name}.'
+			if records else
+			'The recorded activity does not support a specific recommendation.'
+		),
+	}, status=status.HTTP_201_CREATED)

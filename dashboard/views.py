@@ -5,11 +5,13 @@ from rest_framework.response import Response
 
 from dashboard.models import Dashboard
 from dashboard.serializers import DashboardSerializer
+from farm_overview.alert_service import refresh_user_farm_alerts
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_overview(request):
+    refresh_user_farm_alerts(request.user)
     dashboard, _ = Dashboard.objects.get_or_create(owner=request.user)
 
     serializer = DashboardSerializer(dashboard)

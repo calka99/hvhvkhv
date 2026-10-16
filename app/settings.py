@@ -9,13 +9,16 @@ https://docs.djangoproject.com/en/6.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
+from dotenv import load_dotenv
 from datetime import timedelta
 import os
 from pathlib import Path
 import dj_database_url 
 
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -28,6 +31,11 @@ SECRET_KEY = 'django-insecure-wm!gme88%uy7j-7_)zum+ll&rtjw8$(qfdrkozbvh3yg%^nb(_
 DEBUG = True
 
 ALLOWED_HOSTS = ['*', 'http://localhost:3000/']
+
+# API key from environment variable
+WEATHER_API_KEY = os.getenv('WEATHER_API_KEY', '').strip()
+GROQ_API_KEY = os.getenv('GROQ_API_KEY', '').strip()
+GROQ_MODEL = os.getenv('GROQ_MODEL', 'openai/gpt-oss-20b').strip()
 
 
 # Application definition

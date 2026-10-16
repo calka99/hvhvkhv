@@ -1,5 +1,6 @@
 
 from django.shortcuts import get_object_or_404
+from django.db.models import Sum
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Alert, Farm, Livestock, MarketPrice, Settings
@@ -37,6 +38,36 @@ def create_farm(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_owned_farms(request):
+    farms = Farm.objects.filter(owner=request.user).order_by('name').values('id', 'name')
+    return Response(list(farms))
+
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_farm(request, farm_id):
+    farm = get_object_or_404(Farm, pk=farm_id, owner=request.user)
+    serializer = FarmCreateSerializer(
+        farm,
+        data=request.data,
+        partial=request.method == 'PATCH',
+    )
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    farm = serializer.save()
+    return Response(FarmOutSerializer(farm).data)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_farm(request, farm_id):
+    farm = get_object_or_404(Farm, pk=farm_id, owner=request.user)
+    farm.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
 def get_farm(request, farm_id):
     farm = get_object_or_404(Farm, pk=farm_id)
     serializer = FarmOutSerializer(farm)
@@ -44,10 +75,14 @@ def get_farm(request, farm_id):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_farm_overview(request, farm_id):
-    farm = get_object_or_404(Farm, pk=farm_id)
+    farm = get_object_or_404(Farm, pk=farm_id, owner=request.user)
 
     active_crops = farm.registered_crops.count()
+    total_crop_yield_kg = farm.registered_crops.aggregate(
+        total=Sum('historical_yield_kg')
+    )['total'] or 0
     open_pest_alerts = farm.pest_alerts.filter(resolved=False).count()
     livestock_count = farm.livestock.count()
     latest_soil = farm.soil_readings.order_by('-recorded_at').first()
@@ -58,6 +93,7 @@ def get_farm_overview(request, farm_id):
     overview_data = {
         'farm': farm,
         'active_crops': active_crops,
+        'total_crop_yield_kg': total_crop_yield_kg,
         'open_pest_alerts': open_pest_alerts,
         'livestock_count': livestock_count,
         'latest_soil': latest_soil,

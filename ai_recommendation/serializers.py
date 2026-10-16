@@ -9,6 +9,7 @@ class RecommendationSerializer(serializers.ModelSerializer):
 		fields = [
 			'id',
 			'farm',
+			'month',
 			'category',
 			'title',
 			'message',

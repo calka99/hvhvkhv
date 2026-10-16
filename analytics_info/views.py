@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 
 from farm_overview.models import AnalyticsSnapshot
@@ -11,12 +11,13 @@ from .serializers import AnalyticsSnapshotSerializer
 # Analytics Views
 
 @api_view(['GET'])
+@permission_classes([IsAdminUser])
 def list_analytics(request):
     farm_id = request.query_params.get('farm_id')
-    analytics = AnalyticsSnapshot.objects.all()
+    analytics = AnalyticsSnapshot.objects.filter(farm__owner=request.user)
     if farm_id:
-        analytics = analytics.filter(farm_id=farm_id)
-    analytics = analytics.order_by('-id')
+        analytics = analytics.filter(farm_id=farm_id, farm__owner=request.user)
+    analytics = analytics.order_by('period_label', 'id')
     serializer = AnalyticsSnapshotSerializer(analytics, many=True)
     return Response(serializer.data)
 
@@ -33,6 +34,7 @@ def create_analytics(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAdminUser])
 def get_analytics(request, analytics_id):
     analytics = get_object_or_404(AnalyticsSnapshot, pk=analytics_id)
     serializer = AnalyticsSnapshotSerializer(analytics)

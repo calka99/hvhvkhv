@@ -92,3 +92,71 @@ class AccountAuthTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class AccountPasswordChangeTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='password-owner',
+            email='password-owner@example.com',
+            password='StrongPass123!',
+        )
+        self.client.force_authenticate(self.user)
+
+    def test_authenticated_user_can_change_password(self):
+        response = self.client.post(
+            reverse('account-change-password'),
+            {
+                'current_password': 'StrongPass123!',
+                'new_password': 'NewStrongPass456!',
+                'confirm_password': 'NewStrongPass456!',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('NewStrongPass456!'))
+
+    def test_password_change_rejects_incorrect_current_password(self):
+        response = self.client.post(
+            reverse('account-change-password'),
+            {
+                'current_password': 'WrongPass123!',
+                'new_password': 'NewStrongPass456!',
+                'confirm_password': 'NewStrongPass456!',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('StrongPass123!'))
+
+    def test_password_change_rejects_mismatched_confirmation(self):
+        response = self.client.post(
+            reverse('account-change-password'),
+            {
+                'current_password': 'StrongPass123!',
+                'new_password': 'NewStrongPass456!',
+                'confirm_password': 'DifferentPass789!',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('confirm_password', response.data)
+
+    def test_password_change_rejects_password_that_fails_django_validators(self):
+        response = self.client.post(
+            reverse('account-change-password'),
+            {
+                'current_password': 'StrongPass123!',
+                'new_password': 'password',
+                'confirm_password': 'password',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('new_password', response.data)

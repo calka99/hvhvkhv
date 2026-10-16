@@ -4,7 +4,24 @@ from farm_overview.models import Farm
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    lifespan_days = models.PositiveIntegerField(default=90)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
+class CropType(models.Model):
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="crop_types")
+    name = models.CharField(max_length=100)
+    lifespan_days = models.PositiveIntegerField(default=90)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["category", "name"], name="unique_crop_type_per_category"),
+        ]
+        ordering = ["category__name", "name"]
 
     def __str__(self):
         return self.name
@@ -13,6 +30,7 @@ class Category(models.Model):
 class Crop(models.Model):
     farm = models.ForeignKey(Farm, on_delete=models.CASCADE, related_name="registered_crops")
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name="crops")
+    crop_type = models.ForeignKey(CropType, on_delete=models.SET_NULL, null=True, blank=True, related_name="crops")
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -21,6 +39,7 @@ class Crop(models.Model):
     growth_stage = models.CharField(max_length=100, default="seedling")
     planting_date = models.DateTimeField(null=True, blank=True)
     expected_harvest_date = models.DateTimeField(blank=True, null=True)
+    harvested_at = models.DateTimeField(blank=True, null=True)
     planting_density = models.CharField(max_length=100, blank=True, null=True)
     area_hectares = models.FloatField(default=0.0)
     historical_yield_kg = models.FloatField(blank=True, null=True)

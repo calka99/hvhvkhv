@@ -1,3 +1,8 @@
 from django.contrib import admin
+from .models import LivestockType
 
-# Register your models here.
+
+@admin.register(LivestockType)
+class LivestockTypeAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    search_fields = ("name",)

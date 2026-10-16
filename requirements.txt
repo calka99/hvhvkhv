@@ -5,5 +5,6 @@ django-cors-headers==4.9.0
 whitenoise==6.12.0
 djangorestframework==3.18.0
 djangorestframework-simplejwt==5.3.1
+python-dotenv
 sqlparse==0.5.5
 tzdata==2026.3

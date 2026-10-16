@@ -37,6 +37,10 @@ class Dashboard(models.Model):
         return sum(farm.pest_alerts.filter(resolved=False).count() for farm in self.farms)
 
     @property
+    def total_livestock_health_alerts(self):
+        return sum(farm.livestock_health_alerts.filter(resolved=False).count() for farm in self.farms)
+
+    @property
     def total_livestock(self):
         return sum(farm.livestock.count() for farm in self.farms)
 

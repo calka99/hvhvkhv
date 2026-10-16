@@ -10,6 +10,7 @@ class DashboardSerializer(serializers.ModelSerializer):
     total_farms = serializers.SerializerMethodField()
     total_active_crops = serializers.SerializerMethodField()
     total_pest_alerts = serializers.SerializerMethodField()
+    total_livestock_health_alerts = serializers.SerializerMethodField()
     total_livestock = serializers.SerializerMethodField()
     latest_soil_reading = serializers.SerializerMethodField()
     latest_weather_log = serializers.SerializerMethodField()
@@ -27,6 +28,7 @@ class DashboardSerializer(serializers.ModelSerializer):
             'total_farms',
             'total_active_crops',
             'total_pest_alerts',
+            'total_livestock_health_alerts',
             'total_livestock',
             'latest_soil_reading',
             'latest_weather_log',
@@ -41,6 +43,9 @@ class DashboardSerializer(serializers.ModelSerializer):
 
     def get_total_pest_alerts(self, obj):
         return obj.total_pest_alerts
+
+    def get_total_livestock_health_alerts(self, obj):
+        return obj.total_livestock_health_alerts
 
     def get_total_livestock(self, obj):
         return obj.total_livestock

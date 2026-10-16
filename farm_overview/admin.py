@@ -7,6 +7,7 @@ from .models import (
     IrrigationEvent,
     PestAlert,
     Livestock,
+    LivestockHealthAlert,
     MarketPrice,
     AnalyticsSnapshot,
     Report,
@@ -69,6 +70,13 @@ class LivestockAdmin(admin.ModelAdmin):
     search_fields = ('farm__name', 'species', 'tag_id')
 
 
+@admin.register(LivestockHealthAlert)
+class LivestockHealthAlertAdmin(admin.ModelAdmin):
+    list_display = ('farm', 'livestock', 'disease_name', 'severity', 'detected_at', 'resolved')
+    list_filter = ('farm', 'severity', 'resolved', 'detected_at')
+    search_fields = ('disease_name', 'livestock__species', 'farm__name')
+
+
 @admin.register(MarketPrice)
 class MarketPriceAdmin(admin.ModelAdmin):
     list_display = ('commodity', 'region', 'price_per_kg', 'currency', 'trend', 'recorded_at')
@@ -102,6 +110,6 @@ class AlertAdmin(admin.ModelAdmin):
 
 @admin.register(Settings)
 class SettingsAdmin(admin.ModelAdmin):
-    list_display = ('farm', 'notifications_enabled', 'ai_recommendations_enabled', 'language')
-    list_filter = ('farm', 'notifications_enabled', 'ai_recommendations_enabled')
+    list_display = ('farm', 'notifications_enabled', 'language')
+    list_filter = ('farm', 'notifications_enabled')
     search_fields = ('farm__name', 'language')

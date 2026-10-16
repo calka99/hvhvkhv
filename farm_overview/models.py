@@ -72,6 +72,7 @@ class IrrigationEvent(models.Model):
     water_liters = models.FloatField(blank=True, null=True)
     trigger_reason = models.CharField(max_length=100, blank=True, null=True)
     status = models.CharField(max_length=50, default="scheduled")
+    completed_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f"Irrigation event for {self.farm.name} in {self.zone}"
@@ -103,6 +104,19 @@ class Livestock(models.Model):
 
     def __str__(self):
         return f"{self.count} x {self.species} on {self.farm.name}"
+
+
+class LivestockHealthAlert(models.Model):
+    farm = models.ForeignKey(Farm, on_delete=models.CASCADE, related_name="livestock_health_alerts")
+    livestock = models.ForeignKey(Livestock, on_delete=models.CASCADE, related_name="health_alerts")
+    disease_name = models.CharField(max_length=255)
+    severity = models.CharField(max_length=50, default="medium")
+    detected_at = models.DateTimeField(default=timezone.now)
+    recommended_action = models.TextField(blank=True, null=True)
+    resolved = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.disease_name} for {self.livestock.species} on {self.farm.name}"
 
 
 class MarketPrice(models.Model):
@@ -159,8 +173,6 @@ class Alert(models.Model):
 class Settings(models.Model):
     farm = models.ForeignKey(Farm, on_delete=models.CASCADE, related_name="settings")
     notifications_enabled = models.BooleanField(default=True)
-    ai_recommendations_enabled = models.BooleanField(default=True)
-    sms_alerts_enabled = models.BooleanField(default=False)
     data_sync_interval_minutes = models.IntegerField(default=15)
     connected_devices = models.IntegerField(default=0)
     language = models.CharField(max_length=20, default="en")
@@ -170,4 +182,3 @@ class Settings(models.Model):
 
     def __str__(self):
         return f"Settings for {self.farm.name}"
-

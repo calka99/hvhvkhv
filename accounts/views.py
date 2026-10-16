@@ -7,6 +7,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from dashboard.models import Dashboard
 from .serializers import (
+    ChangePasswordSerializer,
     RegisterSerializer,
     UserProfileSerializer,
     UserProfileUpdateSerializer,
@@ -105,3 +106,16 @@ def update_profile(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     serializer.save()
     return Response(UserProfileSerializer(request.user).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    serializer = ChangePasswordSerializer(
+        data=request.data,
+        context={'request': request},
+    )
+    serializer.is_valid(raise_exception=True)
+    request.user.set_password(serializer.validated_data['new_password'])
+    request.user.save(update_fields=['password'])
+    return Response({'detail': 'Password changed successfully.'})

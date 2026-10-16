@@ -11,6 +11,7 @@ class Recommendation(models.Model):
 	]
 
 	farm = models.ForeignKey(Farm, on_delete=models.CASCADE, related_name='recommendations')
+	month = models.DateField(null=True, blank=True, db_index=True)
 	category = models.CharField(max_length=50)
 	title = models.CharField(max_length=255)
 	message = models.TextField()
