@@ -81,6 +81,8 @@ class RecommendationTests(APITestCase):
 		self.assertEqual(response.data['month'], self.month_date.isoformat())
 		self.assertEqual(response.data['recommendation_count'], 1)
 		self.assertEqual(response.data['status'], 'generated')
+		self.assertEqual(response.data['recommendations'][0]['title'], 'Review soil readings')
+		self.assertEqual(response.data['recommendations'][0]['message'], 'Review this month’s soil readings.')
 		generate_ai.assert_called_once()
 		self.assertEqual(
 			Recommendation.objects.filter(farm=self.farm, month=self.month_date).count(),

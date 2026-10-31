@@ -1,6 +1,7 @@
 import logging
 
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -12,6 +13,7 @@ from reports.views import build_activity_data, parse_month
 from settings.models import FarmPreference
 
 from .models import Recommendation
+from .serializers import RecommendationSerializer
 from .services import generate_ai_recommendations
 
 logger = logging.getLogger(__name__)
@@ -79,6 +81,7 @@ def recommendations(request):
 			'month': month.isoformat(),
 			'status': 'no_activity',
 			'recommendation_count': 0,
+			'recommendations': [],
 			'detail': 'No farm activities were recorded for this month, so no recommendations were generated.',
 		})
 
@@ -122,8 +125,9 @@ def recommendations(request):
 		'month': month.isoformat(),
 		'status': 'generated' if records else 'no_recommendations',
 		'recommendation_count': len(records),
+		'recommendations': RecommendationSerializer(records, many=True).data,
 		'detail': (
-			f'Generated {len(records)} recommendation(s) for {farm.name}.'
+			f'Generated {len(records)} recommendation{"s" if len(records) != 1 else ""} for {farm.name}.'
 			if records else
 			'The recorded activity does not support a specific recommendation.'
 		),

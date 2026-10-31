@@ -28,9 +28,9 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = 'django-insecure-wm!gme88%uy7j-7_)zum+ll&rtjw8$(qfdrkozbvh3yg%^nb(_'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['*', 'http://localhost:3000/']
+ALLOWED_HOSTS = ['*','http://localhost:3000/','https://dikachifarmos-backend.onrender.com']
 
 # API key from environment variable
 WEATHER_API_KEY = os.getenv('WEATHER_API_KEY', '').strip()
@@ -81,6 +81,12 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "https://dikachi-farm-os.vercel.app",
+    *[
+        origin.strip().rstrip("/")
+        for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+        if origin.strip()
+    ],
 ]
 
 ROOT_URLCONF = 'app.urls'

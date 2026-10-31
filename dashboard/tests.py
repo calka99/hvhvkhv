@@ -7,6 +7,23 @@ from farm_overview.models import Farm, SoilReading, WeatherLog
 
 
 class DashboardOverviewTests(APITestCase):
+    def test_dashboard_cors_preflight_allows_frontend_origin(self):
+        response = self.client.options(
+            reverse('dashboard-overview'),
+            HTTP_ORIGIN='https://dikachi-farm-os.vercel.app',
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD='GET',
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS='authorization,content-type',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['Access-Control-Allow-Origin'],
+            'https://dikachi-farm-os.vercel.app',
+        )
+        allowed_headers = response['Access-Control-Allow-Headers'].lower()
+        self.assertIn('authorization', allowed_headers)
+        self.assertIn('content-type', allowed_headers)
+
     def test_dashboard_overview_returns_summary(self):
         user = get_user_model().objects.create_user(
             username='farmowner',
